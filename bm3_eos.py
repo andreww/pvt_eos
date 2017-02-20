@@ -265,3 +265,46 @@ def get_V(P, T, fV0, fK0, fKp0):
     V = spopt.brentq(p_err_func, 0.1*V0, 2.0*V0)
     return V
 
+if __name__ == "__main__":
+    # If run from the command line read data from files and 
+    # evaluate / plot EOS or report results
+    help_str="""Fit a set of EVT data to isothermal 3rd order BM EOS
+
+                Data must be supplied in files (one for each cell volume)
+                which consist of the cell volume (in cubic angstroms) on
+                the first line followed by a serise of lines each with a
+                temperature (in K, must increase down the file) and the 
+                free energy. By default each file is read and an isothermal
+                EOS is fitted for each temperature. The parameters are fitted
+                to a quintic polynomial. The volume is then evaluate on a grid
+                of PVT points and written to standard output. Plots can be
+                created (and data can be written to files).
+             """
+
+    import argparse
+    parser = argparse.ArgumentParser(description=help_str)
+    parser.add_argument('datafiles', nargs='+', 
+                         help='One file per volume to fit')
+    parser.add_argument('--plot_pv', default=None,
+                         help='Create a graph of the PV data and fit')
+    parser.add_argument('--plot_ev', default=None,
+                         help='Create a graph of the EV data and fit')
+    parser.add_argument('--plot_both', default=None,
+                         help='Create stacked PV and EV plots')
+    parser.add_argument('--latex_table', default=None,
+                         help='Create LaTeX file of fitting parameters')
+    parser.add_argument('--evaluate_out', default=None,
+                         help='Write point by point data to a file')
+    parser.add_argument('--max_t', default=2000, type=float,
+                         help='Maximum temperature to evaulate results (K)')
+    parser.add_argument('--min_t', default=300, type=float,
+                         help='Minimum temperature to evaulate results (K)')
+    parser.add_argument('--step_t', default=100, type=float,
+                         help='Temperature step to evaulate results (K)')
+    parser.add_argument('--max_p', default=50, type=float,
+                         help='Maximum temperature to evaulate results (GPa)')
+    parser.add_argument('--min_p', default=0, type=float,
+                         help='Minimum temperature to evaulate results (GPa)')
+    parser.add_argument('--step_p', default=10, type=float,
+                         help='Temperature step to evaulate results (GPa)')
+    args=parser.parse_args()
