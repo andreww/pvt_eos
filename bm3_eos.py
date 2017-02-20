@@ -265,6 +265,79 @@ def get_V(P, T, fV0, fK0, fKp0):
     V = spopt.brentq(p_err_func, 0.1*V0, 2.0*V0)
     return V
 
+
+def read_data_file(filename, data):
+    "Read one of our datafiles and append to data array"
+    ts = []
+    with open(filename, 'r') as fh:
+        v = None
+        u = None
+        zpe = None
+        for line in fh:
+            words = line.split()
+            if v is None:
+                v = float(words[0])
+                u = float(words[1])
+                zpe = float(words[2])
+            else:
+                t = float(words[0])
+                f = float(words[1])
+                # FIXME: do we also want E, S and Cv, do we want to plot them?
+                data.append(v, u, zpe, t, None, f, None, None)
+                ts.append(t)
+
+    return data, ts
+
+
+def get_VF(data_table, T):
+    """Given the data file from parse_castep_file return useful data at T
+       The data table is searched for data at the target temperature, T
+       (K), and numpy arrays of volumes (A**3) and the Helmholtz free 
+       energy, F, (eV) is returned. Note that: 
+           F(V,T) = U(V) + F_{vib}(V,T)
+       where U(V) (static) potential energy of the system at the chosen
+       volume and F_{vib}(V,T) is the vibrational Helmholtz free energy
+       given by:
+           F_{vib}(V,T) = ZPE(V) + E_{vib}(V,T) - T.S_{vib}(V,T)
+       i.e. the sum of the zero point energy, the phonon internal 
+       energy and the phonon entropy. This second summation is 
+       performed by Castep and F_{vib} is reported in the table of 
+       thermodynamic quantaties. 
+       If T==0 this function returns U(V)+ZPE(V), which can be used to 
+       fit a true zero K EOS. If T=='static' just U(V) is returned, which
+       can be used to fit a athermal, or static, EOS. 
+    """
+    # For static or 0K runs, we can use any T we choose, so use the
+    # first one in the table.
+    if T=='static':
+        mode = 'static'
+        T = data_table[0][3]
+    elif T==0:
+        mode = 'zpe'
+        T = data_table[0][3]
+    else:
+        mode = 'f'
+    
+    F = []
+    V = []
+    for line in data_table:
+        if line[3] == T:
+            if mode == 'static':
+                F.append(line[1]) # F(V,0) = U(V)
+                V.append(line[0])
+            elif mode == 'zpe':
+                F.append(line[2] + line[1]) # F(V,0) = U(V)+ZPE(V)
+                V.append(line[0])
+            else:
+                # Move to total helmholtz free energy
+                # this is U_0(V) + F_vib(V,T)
+                F.append(line[5]+line[1])
+                V.append(line[0])
+    F = np.array(F)
+    V = np.array(V)
+    return V, F
+                
+
 if __name__ == "__main__":
     # If run from the command line read data from files and 
     # evaluate / plot EOS or report results
@@ -291,10 +364,10 @@ if __name__ == "__main__":
                          help='Create a graph of the EV data and fit')
     parser.add_argument('--plot_both', default=None,
                          help='Create stacked PV and EV plots')
+    parser.add_argument('--polyplot', default=None,
+                         help='Plot the polynomial fits')
     parser.add_argument('--latex_table', default=None,
                          help='Create LaTeX file of fitting parameters')
-    parser.add_argument('--evaluate_out', default=None,
-                         help='Write point by point data to a file')
     parser.add_argument('--max_t', default=2000, type=float,
                          help='Maximum temperature to evaulate results (K)')
     parser.add_argument('--min_t', default=300, type=float,
@@ -308,3 +381,52 @@ if __name__ == "__main__":
     parser.add_argument('--step_p', default=10, type=float,
                          help='Temperature step to evaulate results (GPa)')
     args=parser.parse_args()
+
+    # Build basic data table
+    data = []
+    for file in args.datafiles:
+        print("Reading data from: ", file)
+        data, ts = read_data_file(file, data)
+        # NB: we assume that ts is the same for each file!
+
+    # Fit EOS parameters at each T and store
+    vs = []
+    fs = []
+    k0s = []
+    kp0s = []
+    e0s = []
+    v0s = []
+    min_v = 1.0E12
+    max_v = 0.0
+    for t in ts:
+        v, f = get_VF(data, t)
+        v0, e0, k0, kp0 =  fit_BM3_EOS(v, f, verbose=True)
+        if np.max(v) > max_v: max_v = np.max(v)
+        if np.min(v) < min_v: min_v = np.min(v)
+        vs.append(v)
+        fs.append(f)
+        k0s.append(k0)
+        kp0s.append(kp0)
+        e0s.append(e0)
+        v0s.append(v0)
+
+    # If we need them, plot graphs of isothemal EOS
+    if args.plot_both is not None:
+        BM3_EOS_twoplots(np.floor(min_V), np.ceil(max_V), 
+            vs, fs, v0s, e0s, k0s, kp0s, ts, filename=args.plot_both)
+    if args.plot_pv is not None:
+        raise NotImplementedError
+    if args.plot_ev is not None:
+        raise NotImplementedError
+
+    # now fit the polynomials, plotting if needed
+    pplot = False
+    if args.polyplot is not None: 
+        pplot = True
+    ff0, fe0, fk0, fkp0 = fit_parameters_quad(ts, v0s, e0s, k0s, kp0s,
+        plot=pplot, filename=args.polyplot, table=args.latex_table)
+
+    print("P (GPa) T (K) V (ang**3)")
+    for evalp in np.arange(args.min_p, args.max_p, args.step_p):
+        for evalt in np,arange(args.min_t, args.max_t, args.step_t):
+            print(evalp, evalt, get_V(evalp, evalt, fV0, fK0, fKp0))
