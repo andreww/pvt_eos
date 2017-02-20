@@ -344,7 +344,8 @@ if __name__ == "__main__":
     help_str="""Fit a set of EVT data to isothermal 3rd order BM EOS
 
                 Data must be supplied in files (one for each cell volume)
-                which consist of the cell volume (in cubic angstroms) on
+                which consist of the cell volume (in cubic angstroms) internal
+                energy and zero point energy (both in electron volts) on
                 the first line followed by a serise of lines each with a
                 temperature (in K, must increase down the file) and the 
                 free energy. By default each file is read and an isothermal
