@@ -7,7 +7,7 @@ import scipy.optimize as spopt
 def fit_BM3_EOS(V, F, verbose=False):
     """Fit parameters of a 3rd order BM EOS"""
     popt, pconv = spopt.curve_fit(BM3_EOS_energy, V, F, 
-                   p0=[np.mean(V), np.mean(F), 150.0, 4.0])
+                   p0=[np.mean(V), np.mean(F), 170.0, 4.0], maxfev=10000)
     V0 = popt[0]
     E0 = popt[1]
     K0 = popt[2]
@@ -283,7 +283,7 @@ def read_data_file(filename, data):
                 t = float(words[0])
                 f = float(words[1])
                 # FIXME: do we also want E, S and Cv, do we want to plot them?
-                data.append(v, u, zpe, t, None, f, None, None)
+                data.append([v, u, zpe, t, None, f, None, None])
                 ts.append(t)
 
     return data, ts
@@ -400,7 +400,10 @@ if __name__ == "__main__":
     min_v = 1.0E12
     max_v = 0.0
     for t in ts:
+        print("Working on:", t)
         v, f = get_VF(data, t)
+        print(v)
+        print(f)
         v0, e0, k0, kp0 =  fit_BM3_EOS(v, f, verbose=True)
         if np.max(v) > max_v: max_v = np.max(v)
         if np.min(v) < min_v: min_v = np.min(v)
@@ -413,7 +416,7 @@ if __name__ == "__main__":
 
     # If we need them, plot graphs of isothemal EOS
     if args.plot_both is not None:
-        BM3_EOS_twoplots(np.floor(min_V), np.ceil(max_V), 
+        BM3_EOS_twoplots(np.floor(min_v), np.ceil(max_v), 
             vs, fs, v0s, e0s, k0s, kp0s, ts, filename=args.plot_both)
     if args.plot_pv is not None:
         raise NotImplementedError
@@ -424,10 +427,10 @@ if __name__ == "__main__":
     pplot = False
     if args.polyplot is not None: 
         pplot = True
-    ff0, fe0, fk0, fkp0 = fit_parameters_quad(ts, v0s, e0s, k0s, kp0s,
+    fv0, fe0, fk0, fkp0 = fit_parameters_quad(ts, v0s, e0s, k0s, kp0s,
         plot=pplot, filename=args.polyplot, table=args.latex_table)
 
     print("P (GPa) T (K) V (ang**3)")
     for evalp in np.arange(args.min_p, args.max_p, args.step_p):
-        for evalt in np,arange(args.min_t, args.max_t, args.step_t):
-            print(evalp, evalt, get_V(evalp, evalt, fV0, fK0, fKp0))
+        for evalt in np.arange(args.min_t, args.max_t, args.step_t):
+            print(evalp, evalt, get_V(evalp, evalt, fv0, fk0, fkp0))
