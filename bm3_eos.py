@@ -6,12 +6,14 @@ import scipy.optimize as spopt
 
 def fit_BM3_EOS(V, F, verbose=False):
     """Fit parameters of a 3rd order BM EOS"""
-    popt, pconv = spopt.curve_fit(BM3_EOS_energy, V, F, 
-                   p0=[np.mean(V), np.mean(F), 170.0, 4.0], maxfev=10000)
+    popt, pconv = spopt.curve_fit(BM2_EOS_energy, V, F, 
+                   p0=[np.mean(V), np.mean(F), 170.0], maxfev=10000)
+                   #p0=[np.mean(V), np.mean(F), 170.0, 4.0], maxfev=10000)
     V0 = popt[0]
     E0 = popt[1]
     K0 = popt[2]
-    Kp0 = popt[3]
+    #Kp0 = popt[3]
+    Kp0 =  4.0
     if verbose:
         print "Fitted 3rd order Birch-Murnaghan EOS parameters:"
         print " E0  = {:7g} eV".format(E0)
@@ -35,7 +37,25 @@ def BM3_EOS_pressure(V, V0, K0, Kp0):
                       (1.0+(3.0/4.0)*(Kp0-4.0)*((V0/V)**(2.0/3.0)-1))
     return P 
 
-def fit_parameters_quad(Ts, V0s, E0s, K0s, Kp0s, 
+
+def BM2_EOS_energy (V, V0, E0, K0):
+    """Calculate the energy from a 2rd order BM EOS"""
+
+    Kp0 = 4.0
+
+    E = E0 + ((9.0*V0*K0)/16.0) * ( (((V0/V)**(2.0/3.0)-1.0)**3.0)*Kp0 +
+             (((V0/V)**(2.0/3.0) - 1.0)**2.0 * (6.0-4.0*(V0/V)**(2.0/3.0))))
+    return E
+
+def BM2_EOS_pressure(V, V0, K0):
+    """Calculate the pressure from a 2rd order BM EOS"""
+
+    Kp0 = 4.0
+
+    P = (3.0*K0/2.0) * ((V0/V)**(7.0/3.0)-(V0/V)**(5.0/3.0)) * \
+                      (1.0+(3.0/4.0)*(Kp0-4.0)*((V0/V)**(2.0/3.0)-1))
+
+def fit_parameters_quad(Ts, V0s, E0s, K0s, Kp0s=None, 
         plot=False, filename=None, table=None):
 
     poptv, pconv = spopt.curve_fit(_quint_func, np.array(Ts), 
@@ -56,11 +76,14 @@ def fit_parameters_quad(Ts, V0s, E0s, K0s, Kp0s,
     fK0 = lambda t: _quint_func(t, poptk[0], poptk[1], poptk[2],
                                        poptk[3], poptk[4], poptk[5])
 
-    poptkp, pconv = spopt.curve_fit(_quint_func, np.array(Ts), 
-                      np.array(Kp0s), p0=[0.0, 0.0, 0.0,
-                      0.0, 0.0, np.mean(Kp0s)])
-    fKp0 = lambda t: _quint_func(t, poptkp[0], poptkp[1], poptkp[2],
-                                        poptkp[3], poptkp[4], poptkp[5])
+    if Kp0s is not None:
+        poptkp, pconv = spopt.curve_fit(_quint_func, np.array(Ts), 
+                          np.array(Kp0s), p0=[0.0, 0.0, 0.0,
+                          0.0, 0.0, np.mean(Kp0s)])
+        fKp0 = lambda t: _quint_func(t, poptkp[0], poptkp[1], poptkp[2],
+                                            poptkp[3], poptkp[4], poptkp[5])
+    else:
+        fKp0 = lambda t: _quint_func(t, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0)
 
     if table is not None:
         # Write out (LaTeX) table of EOS fitting functions
@@ -369,15 +392,15 @@ if __name__ == "__main__":
                          help='Plot the polynomial fits')
     parser.add_argument('--latex_table', default=None,
                          help='Create LaTeX file of fitting parameters')
-    parser.add_argument('--max_t', default=2000, type=float,
+    parser.add_argument('--max_t', default=1000, type=float,
                          help='Maximum temperature to evaulate results (K)')
     parser.add_argument('--min_t', default=300, type=float,
                          help='Minimum temperature to evaulate results (K)')
     parser.add_argument('--step_t', default=100, type=float,
                          help='Temperature step to evaulate results (K)')
-    parser.add_argument('--max_p', default=50, type=float,
+    parser.add_argument('--max_p', default=110, type=float,
                          help='Maximum temperature to evaulate results (GPa)')
-    parser.add_argument('--min_p', default=0, type=float,
+    parser.add_argument('--min_p', default=60, type=float,
                          help='Minimum temperature to evaulate results (GPa)')
     parser.add_argument('--step_p', default=10, type=float,
                          help='Temperature step to evaulate results (GPa)')
