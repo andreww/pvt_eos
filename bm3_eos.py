@@ -3,6 +3,15 @@
 import numpy as np
 import scipy.optimize as spopt
 
+# Some regular expressions that get use a lot,
+# so we compile them when the module is loaded
+_vol_re = re.compile(r'Current cell volume =\s+(\d+\.\d+)\s+A\*\*3')
+_zpe_re = re.compile(r'Zero-point energy =\s+(\d+\.\d+)\s+eV')
+_tmo_re = re.compile(
+   r'(\d+\.\d+)\s+(\d+\.\d+)\s+([+-]?\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)')
+_ufb_re = re.compile(
+   r'Total energy corrected for finite basis set =\s+([+-]?\d+\.\d+)\s+eV')
+
 
 def fit_BM3_EOS(V, F, verbose=False):
     """Fit parameters of a 3rd order BM EOS"""
