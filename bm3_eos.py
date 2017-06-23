@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Tools for fitting 3rd order Birch-Murnaghan EOS"""
+import re
 import numpy as np
 import scipy.optimize as spopt
 
