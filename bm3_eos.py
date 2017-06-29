@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Tools for fitting 3rd order Birch-Murnaghan EOS"""
 import numpy as np
+import re
 import scipy.optimize as spopt
 
 # Some regular expressions that get use a lot,
@@ -460,6 +461,12 @@ if __name__ == "__main__":
                          help='Minimum temperature to evaulate results (GPa)')
     parser.add_argument('--step_p', default=10, type=float,
                          help='Temperature step to evaulate results (GPa)')
+    parser.add_argument('--min_t_analysis', default=None, type=float,
+                         help='Minimum temperature for analysis')
+    parser.add_argument('--max_t_analysis', default=None, type=float,
+                         help='Maximum temperature for analysis')
+    parser.add_argument('--step_size_analysis', default=None, type=float,
+                         help='Step size for analysis')
     args=parser.parse_args()
 
     # Build basic data table
@@ -479,7 +486,11 @@ if __name__ == "__main__":
     v0s = []
     min_v = 1.0E12
     max_v = 0.0
-    for t in ts:
+    if args.min_t_analysis is not None:
+        tlist = np.arange(args.min_t_analysis, args.max_t_analysis, args.step_size_analysis)
+    else: 
+        tlist = ts
+    for t in tlist:
         print("Working on:", t)
         v, f = get_VF(data, t)
         print(v)
@@ -497,7 +508,7 @@ if __name__ == "__main__":
     # If we need them, plot graphs of isothemal EOS
     if args.plot_both is not None:
         BM3_EOS_twoplots(np.floor(min_v), np.ceil(max_v), 
-            vs, fs, v0s, e0s, k0s, kp0s, ts, filename=args.plot_both)
+            vs, fs, v0s, e0s, k0s, kp0s, tlist, filename=args.plot_both)
     if args.plot_pv is not None:
         raise NotImplementedError
     if args.plot_ev is not None:
@@ -507,7 +518,7 @@ if __name__ == "__main__":
     pplot = False
     if args.polyplot is not None: 
         pplot = True
-    fv0, fe0, fk0, fkp0 = fit_parameters_quad(ts, v0s, e0s, k0s, kp0s,
+    fv0, fe0, fk0, fkp0 = fit_parameters_quad(tlist, v0s, e0s, k0s, kp0s,
         plot=pplot, filename=args.polyplot, table=args.latex_table)
 
     print("P (GPa) T (K) V (ang**3)")
