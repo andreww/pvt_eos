@@ -469,7 +469,7 @@ if __name__ == "__main__":
         print("Reading data from: ", file)
         #data, ts = read_data_file(file, data)
         # NB: we assume that ts is the same for each file!
-        idata, ts = parse_castep_file(file, data)
+        data, ts = parse_castep_file(file, data)
 
     # Fit EOS parameters at each T and store
     vs = []
