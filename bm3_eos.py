@@ -10,8 +10,17 @@ _vol_re = re.compile(r'Current cell volume =\s+(\d+\.\d+)\s+A\*\*3')
 _zpe_re = re.compile(r'Zero-point energy =\s+(\d+\.\d+)\s+eV')
 _tmo_re = re.compile(
    r'(\d+\.\d+)\s+(\d+\.\d+)\s+([+-]?\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)')
+# An old version of CASTEP did the basis set correction at the start of the
+# phonons calculation, so this worked out okay... but now it does not
+#_ufb_re = re.compile(
+#   r'Total energy corrected for finite basis set =\s+([+-]?\d+\.\d+)\s+eV')
+# so we now use the LBFGS report, I guess this ties us to that optimiser
 _ufb_re = re.compile(
-   r'Total energy corrected for finite basis set =\s+([+-]?\d+\.\d+)\s+eV')
+   r'LBFGS: finished iteration\s+\d+ with enthalpy=\s+([+-]?\d+\.\d+E[+-]?\d+)\seV')
+# but that would need the PV term removing (we need hemoltz free energy not gibbs)
+# and the thing at the end of the scf loop lacks the basis set correction ... so
+# remove PV
+_p_re = re.compile(r' *\s+Pressure:\s+([+-]?\d+\.\d+)\s+\*')
 
 
 def fit_BM3_EOS(V, F, verbose=False):
@@ -298,7 +307,7 @@ def read_data_file(filename, data):
 
     return data, ts
 
-def parse_castep_file(filename, current_data=[]):
+def parse_castep_file(filename, current_data=[], verbose=False):
     """Read a Castep output file with thermodynamic data and extract it
 
        This appends thermodynamic data, in the form of a tuple, for
@@ -317,6 +326,8 @@ def parse_castep_file(filename, current_data=[]):
     """
 
     ts = []
+    if verbose:
+        print(f"Reading from {filename}")
     fh = open(filename, 'r')
     current_volume = None
     in_thermo = False
@@ -329,18 +340,31 @@ def parse_castep_file(filename, current_data=[]):
         if match:
             # We need to keep track of the *current* volume
             current_volume = float(match.group(1))
+            if verbose:
+                print(f"Volume: {current_volume}")
             continue
         match = _ufb_re.search(line)
         if match:
             # We need to keep track of the *current* internal energy
-            U = float(match.group(1))
+            # but this is enthalpy
+            H = float(match.group(1))
+            if verbose:
+                print(f"Enthalpy: {H}")
             continue
+        match = _p_re.search(line)
+        if match:
+            # We need the actual pressure for PV correction
+            P = float(match.group(1))
+            if verbose:
+                print(f"Pressure: {P} GPa")
         match = _zpe_re.search(line)
         if match:
             # A line with the zero point energy must start a
             # thermo block. We need to skip three
             # lines first though.
             zpe = float(match.group(1))
+            if verbose:
+                print(f"Zero point energy energy: {zpe}")
             in_thermo = True
             skip_lines = 3
             continue
@@ -353,6 +377,11 @@ def parse_castep_file(filename, current_data=[]):
                 F = float(match.group(3))
                 S = float(match.group(4))
                 Cv = float(match.group(5))
+                # 1 eV/A^3 = 160.21766208 GPa
+                # we need U not H, U = H-PV
+                U = H - (current_volume * P / 160.21766208)
+                if verbose:
+                    print(f"T: {T}, H: {H}, U: {U}, F: {F}")
                 current_data.append((current_volume, U, zpe, T,
                                                        E, F, S, Cv))
                 ts.append(T)
@@ -469,7 +498,7 @@ if __name__ == "__main__":
         print("Reading data from: ", file)
         #data, ts = read_data_file(file, data)
         # NB: we assume that ts is the same for each file!
-        data, ts = parse_castep_file(file, data)
+        data, ts = parse_castep_file(file, data, verbose=False)
 
     # Fit EOS parameters at each T and store
     vs = []
@@ -480,6 +509,12 @@ if __name__ == "__main__":
     v0s = []
     min_v = 1.0E12
     max_v = 0.0
+    print("Working on static")
+    v, f = get_VF(data, 'static')
+    v0static, e0static, k0static, kp0static =  fit_BM3_EOS(v, f, verbose=True)
+    print("Working on 0K")
+    v, f = get_VF(data, 0)
+    v0z, e0z, k0z, kp0z =  fit_BM3_EOS(v, f, verbose=True)
     for t in ts:
         print("Working on:", t, "K")
         v, f = get_VF(data, t)
