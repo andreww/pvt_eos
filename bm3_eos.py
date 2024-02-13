@@ -25,18 +25,38 @@ _p_re = re.compile(r' *\s+Pressure:\s+([+-]?\d+\.\d+)\s+\*')
 
 def fit_BM3_EOS(V, F, verbose=False):
     """Fit parameters of a 3rd order BM EOS"""
-    popt, pconv = spopt.curve_fit(BM3_EOS_energy, V, F, 
-                   p0=[np.mean(V), np.mean(F), 170.0, 4.0], maxfev=10000)
+    V0_guess = np.mean(V)
+    F0_guess = np.mean(F)
+    K0_guess = 170.0 # eV.A**3 (which is approx 27000 GPa)
+                     # preserved as default for back compat
+    Kp0_guess = 4.0
+    V0_guess = 174.75
+    K0_guess = 254 / 160.218
+    Kp_guess = 2.8
+
+    popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM3_EOS_energy, V, F,
+                                 p0=[V0_guess, F0_guess, K0_guess, Kp0_guess],
+                                 full_output=True, maxfev=10000)
+
+    print(ier) # 1,2,3 or 4 is okay
+    print(mesg)
+    print("Condition number of covarience matrix", np.linalg.cond(pcov))
+    perr = np.sqrt(np.diag(pcov))
     V0 = popt[0]
+    V0_err = perr[0]
     E0 = popt[1]
+    E0_err = perr[1]
     K0 = popt[2]
+    K0_err = perr[2]
     Kp0 = popt[3]
+    Kp0_err = perr[3]
     if verbose:
-        print( "Fitted 3rd order Birch-Murnaghan EOS parameters:")
-        print( " E0  = {:7g} eV".format(E0))
-        print( " V0  = {:7g} A**3".format(V0))
-        print( " K0  = {:7g} eV.A**-3 ( = {:7g} GPa)".format(K0, K0*160.218))
-        print( " K0' = {:7g}".format(Kp0))
+        print("Fitted 3rd order Birch-Murnaghan EOS parameters:")
+        print(f" E0  = {E0:7g} eV, sigma = {E0_err:7g} eV")
+        print(f" V0  = {V0:7g} A**3, sigma = {V0_err:7g} A**3")
+        print(f" K0  = {K0:7g} eV.A**-3, sigma = {K0_err:7g} A**3")
+        print(f"   ( = {K0*160.218:7g} GPa, sigma = {K0_err*160.218:7g} GPa)")
+        print(f" K0' = {Kp0:7g}, sigma = {Kp0_err:7g}")
     return V0, E0, K0, Kp0
 
 
@@ -46,6 +66,7 @@ def BM3_EOS_energy (V, V0, E0, K0, Kp0):
     E = E0 + ((9.0*V0*K0)/16.0) * ( (((V0/V)**(2.0/3.0)-1.0)**3.0)*Kp0 +
              (((V0/V)**(2.0/3.0) - 1.0)**2.0 * (6.0-4.0*(V0/V)**(2.0/3.0))))
     return E
+
 
 def BM3_EOS_pressure(V, V0, K0, Kp0):
     """Calculate the pressure from a 3rd order BM EOS"""
