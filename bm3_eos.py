@@ -10,13 +10,12 @@ _vol_re = re.compile(r'Current cell volume =\s+(\d+\.\d+)\s+A\*\*3')
 _zpe_re = re.compile(r'Zero-point energy =\s+(\d+\.\d+)\s+eV')
 _tmo_re = re.compile(
    r'(\d+\.\d+)\s+(\d+\.\d+)\s+([+-]?\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)')
-# An old version of CASTEP did the basis set correction at the start of the
-# phonons calculation, so this worked out okay... but now it does not
-#_ufb_re = re.compile(
-#   r'Total energy corrected for finite basis set =\s+([+-]?\d+\.\d+)\s+eV')
-# so we now use the LBFGS report, I guess this ties us to that optimiser
-    r'(\d+\.\d+)\s+(\d+\.\d+)\s+([+-]?\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)')
+# Get U from the basis set correction at the start of the
+# phonons calculation this assumes we are a restart
 _ufb_re = re.compile(
+    r'Total energy corrected for finite basis set =\s+([+-]?\d+\.\d+)\s+eV')
+# We could also use use the LBFGS report to get enthalpy, I guess this ties us to that optimiser
+_enth_re = re.compile(
    r'LBFGS: finished iteration\s+\d+ with enthalpy=\s+([+-]?\d+\.\d+E[+-]?\d+)\seV')
 # but that would need the PV term removing (we need hemoltz free energy not gibbs)
 # and the thing at the end of the scf loop lacks the basis set correction ... so
@@ -331,7 +330,7 @@ def read_data_file(filename, data):
     return data, ts
 
 
-def parse_castep_file(filename, current_data=[]):
+def parse_castep_file(filename, current_data=[], verbose=False):
     """Read a Castep output file with thermodynamic data and extract it
 
        This appends thermodynamic data, in the form of a tuple, for
@@ -367,12 +366,15 @@ def parse_castep_file(filename, current_data=[]):
             continue
         match = _ufb_re.search(line)
         if match:
-            # We need to keep track of the *current* internal energy
-            # but this is enthalpy
+            U = float(match.group(1))
+            if verbose:
+                print(f"Internal energy: {U}")
+            continue
+        match = _enth_re.search(line)
+        if match:
             H = float(match.group(1))
             if verbose:
                 print(f"Enthalpy: {H}")
-            U = float(match.group(1))
             continue
         match = _p_re.search(line)
         if match:
@@ -400,9 +402,10 @@ def parse_castep_file(filename, current_data=[]):
                 F = float(match.group(3))
                 S = float(match.group(4))
                 Cv = float(match.group(5))
+                # If we want to use enthalpy (we don't)
                 # 1 eV/A^3 = 160.21766208 GPa
                 # we need U not H, U = H-PV
-                U = H - (current_volume * P / 160.21766208)
+                Upv = H - (current_volume * P / 160.21766208)
                 if verbose:
                     print(f"T: {T}, H: {H}, U: {U}, F: {F}")
                 # A horrible hack from AMW...
