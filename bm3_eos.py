@@ -69,6 +69,36 @@ def BM3_EOS_energy(V, V0, E0, K0, Kp0):
     return E
 
 
+def fit_BM3_pressure_EOS(P, V, verbose=False):
+    """Fit parameters of a 3rd order BM EOS from PV data"""
+    V0_guess = np.mean(V)
+    K0_guess = 170.0 # eV.A**3 (which is approx 27000 GPa)
+                     # preserved as default for back compat
+    Kp0_guess = 4.0
+
+    popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM3_EOS_pressure, V, P,
+                                 p0=[V0_guess, K0_guess, Kp0_guess],
+                                 full_output=True, maxfev=10000)
+
+    print(ier) # 1,2,3 or 4 is okay
+    print(mesg)
+    print("Condition number of covarience matrix", np.linalg.cond(pcov))
+    perr = np.sqrt(np.diag(pcov))
+    V0 = popt[0]
+    V0_err = perr[0]
+    K0 = popt[1]
+    K0_err = perr[1]
+    Kp0 = popt[2]
+    Kp0_err = perr[2]
+    if verbose:
+        print("Fitted 3rd order Birch-Murnaghan EOS parameters:")
+        print(f" V0  = {V0:7g} A**3, sigma = {V0_err:7g} A**3")
+        print(f" K0  = {K0:7g} GPa, sigma = {K0_err:7g} GPa")
+        print(f"   ( = {K0/160.218:7g} eV.A**-3, sigma = {K0_err/160.218:7g} eV.A**-3)")
+        print(f" K0' = {Kp0:7g}, sigma = {Kp0_err:7g}")
+    return V0, K0, Kp0
+
+
 def BM3_EOS_pressure(V, V0, K0, Kp0):
     """Calculate the pressure from a 3rd order BM EOS"""
 
@@ -412,7 +442,7 @@ def parse_castep_file(filename, current_data=[], verbose=False):
                 # to limt T range for FeAlO3 pv
                 if T < 2000.0:
                     current_data.append((current_volume, U, zpe, T,
-                                         E, F, S, Cv))
+                                         E, F, S, Cv, P))
                     ts.append(T)
                 continue
             else:
@@ -458,11 +488,13 @@ def get_VF(data_table, T):
 
     F = []
     V = []
+    P = []
     for line in data_table:
         if line[3] == T:
             if mode == 'static':
                 F.append(line[1])  # F(V,0) = U(V)
                 V.append(line[0])
+                P.append(line[-1])
             elif mode == 'zpe':
                 F.append(line[2] + line[1])  # F(V,0) = U(V)+ZPE(V)
                 V.append(line[0])
@@ -473,6 +505,9 @@ def get_VF(data_table, T):
                 V.append(line[0])
     F = np.array(F)
     V = np.array(V)
+    if mode == 'static':
+        P = np.array(P)
+        return V, F, P
     return V, F
 
 
@@ -539,10 +574,13 @@ if __name__ == "__main__":
     v0s = []
     min_v = 1.0E12
     max_v = 0.0
-    print("Working on static case")
-    v, f = get_VF(data, 'static')
+    print("Working on static case with PV data")
+    v, f, p = get_VF(data, 'static')
+    print(p)
     print(v)
     print(f)
+    v0, k0, kp0 = fit_BM3_pressure_EOS(p, v, verbose=True)
+    print("Working on static case")
     v0, e0, k0, kp0 = fit_BM3_EOS(v, f, verbose=True)
     print("Working on 0K case")
     v, f = get_VF(data, 0.0)
