@@ -15,6 +15,7 @@ _tmo_re = re.compile(
 #_ufb_re = re.compile(
 #   r'Total energy corrected for finite basis set =\s+([+-]?\d+\.\d+)\s+eV')
 # so we now use the LBFGS report, I guess this ties us to that optimiser
+    r'(\d+\.\d+)\s+(\d+\.\d+)\s+([+-]?\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)')
 _ufb_re = re.compile(
    r'LBFGS: finished iteration\s+\d+ with enthalpy=\s+([+-]?\d+\.\d+E[+-]?\d+)\seV')
 # but that would need the PV term removing (we need hemoltz free energy not gibbs)
@@ -349,8 +350,6 @@ def parse_castep_file(filename, current_data=[]):
     """
 
     ts = []
-    if verbose:
-        print(f"Reading from {filename}")
     fh = open(filename, 'r')
     current_volume = None
     in_thermo = False
@@ -373,6 +372,7 @@ def parse_castep_file(filename, current_data=[]):
             H = float(match.group(1))
             if verbose:
                 print(f"Enthalpy: {H}")
+            U = float(match.group(1))
             continue
         match = _p_re.search(line)
         if match:
@@ -405,9 +405,12 @@ def parse_castep_file(filename, current_data=[]):
                 U = H - (current_volume * P / 160.21766208)
                 if verbose:
                     print(f"T: {T}, H: {H}, U: {U}, F: {F}")
-                current_data.append((current_volume, U, zpe, T,
-                                                       E, F, S, Cv))
-                ts.append(T)
+                # A horrible hack from AMW...
+                # to limt T range for FeAlO3 pv
+                if T < 2000.0:
+                    current_data.append((current_volume, U, zpe, T,
+                                         E, F, S, Cv))
+                    ts.append(T)
                 continue
             else:
                 # Must be at the end of this thermo table
