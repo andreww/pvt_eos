@@ -23,16 +23,18 @@ _enth_re = re.compile(
 _p_re = re.compile(r' *\s+Pressure:\s+([+-]?\d+\.\d+)\s+\*')
 
 
-def fit_BM3_EOS(V, F, verbose=False):
+def fit_BM3_EOS(V, F, V0_guess=None, F0_guess=None,
+                K0_guess=None, Kp0_guess=None, verbose=False):
     """Fit parameters of a 3rd order BM EOS"""
-    V0_guess = np.mean(V)
-    F0_guess = np.mean(F)
-    K0_guess = 170.0 # eV.A**3 (which is approx 27000 GPa)
-                     # preserved as default for back compat
-    Kp0_guess = 4.0
-    V0_guess = 174.75
-    K0_guess = 254 / 160.218
-    Kp_guess = 2.8
+    if V0_guess is None:
+        V0_guess = np.mean(V)
+    if F0_guess is None:
+        F0_guess = np.mean(F)
+    if K0_guess is None:
+        K0_guess = 170.0 # Reasonable? in GPa
+    K0_guess = K0_guess / 160.218 # whatever we have, into eV.A**3
+    if Kp0_guess is None:
+        Kp0_guess = 4.0
 
     popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM3_EOS_energy, V, F,
                                  p0=[V0_guess, F0_guess, K0_guess, Kp0_guess],
@@ -579,9 +581,10 @@ if __name__ == "__main__":
     print(p)
     print(v)
     print(f)
-    v0, k0, kp0 = fit_BM3_pressure_EOS(p, v, verbose=True)
+    v0_guess, k0_guess, kp0_guess = fit_BM3_pressure_EOS(p, v, verbose=True)
     print("Working on static case")
-    v0, e0, k0, kp0 = fit_BM3_EOS(v, f, verbose=True)
+    v0, e0, k0, kp0 = fit_BM3_EOS(v, f, V0_guess=v0_guess, 
+        K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True)
     print("Working on 0K case")
     v, f = get_VF(data, 0.0)
     print(v)
