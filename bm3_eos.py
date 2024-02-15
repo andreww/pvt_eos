@@ -557,6 +557,10 @@ if __name__ == "__main__":
                         help='Minimum temperature to evaulate results (GPa)')
     parser.add_argument('--step_p', default=10, type=float,
                         help='Temperature step to evaulate results (GPa)')
+    parser.add_argument('--do_pv', default=False, type=bool,
+                        help='Fit the volume-pressure data and report (static) EOS parameters')
+    parser.add_argument('--use_pv', default=False, type=bool,
+                        help='Use volume-pressure EOS parameters as initial guess for FV fits')
     args = parser.parse_args()
 
     # Build basic data table
@@ -576,27 +580,36 @@ if __name__ == "__main__":
     v0s = []
     min_v = 1.0E12
     max_v = 0.0
-    print("Working on static case with PV data")
+    print("Working on static case")
     v, f, p = get_VF(data, 'static')
     print(p)
     print(v)
     print(f)
-    v0_guess, k0_guess, kp0_guess = fit_BM3_pressure_EOS(p, v, verbose=True)
-    print("Working on static case")
+    if args.use_pv or args.do_pv:
+        print("Fitting to static PV data")
+        v0_guess, k0_guess, kp0_guess = fit_BM3_pressure_EOS(p, v, verbose=True)
+    if not args.do_pv:
+        # Guesses back to default
+        v0_guess=None
+        k0_guess=None
+        kp0_guess=None
+  
     v0, e0, k0, kp0 = fit_BM3_EOS(v, f, V0_guess=v0_guess, 
         K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True)
     print("Working on 0K case")
     v, f = get_VF(data, 0.0)
     print(v)
     print(f)
-    v0, e0, k0, kp0 = fit_BM3_EOS(v, f, verbose=True)
+    v0, e0, k0, kp0 = fit_BM3_EOS(v, f, V0_guess=v0_guess,
+        K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True)
     ts = [0] + ts
     for t in ts:
         print("Working on:", t, "K")
         v, f = get_VF(data, t)
         print(v)
         print(f)
-        v0, e0, k0, kp0 = fit_BM3_EOS(v, f, verbose=True)
+        v0, e0, k0, kp0 = fit_BM3_EOS(v, f, V0_guess=v0_guess,
+            K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True)
         if np.max(v) > max_v: max_v = np.max(v)
         if np.min(v) < min_v: min_v = np.min(v)
         vs.append(v)
