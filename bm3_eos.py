@@ -356,7 +356,7 @@ def EOS_pressure_plot(Vmin, Vmax, V0, K0, Kp0, EOStype='BM3', ax=None,
             fine_vs = np.linspace(Vmin, Vmax, 100)
             if EOStype == 'BM3':
                 fine_ps = BM3_EOS_pressure(fine_vs, V0[i], K0[i], Kp0[i])
-             elif EOStype == 'BM2':
+            elif EOStype == 'BM2':
                 fine_ps = BM2_EOS_pressure(fine_vs, V0[i], K0[i])
             else:
                 assert False, "Unknown EOS"
