@@ -23,7 +23,7 @@ _enth_re = re.compile(
 _p_re = re.compile(r' *\s+Pressure:\s+([+-]?\d+\.\d+)\s+\*')
 
 
-def fit_BM3_EOS(V, F, V0_guess=None, F0_guess=None,
+def fit_EOS(V, F, EOStype='BM3', V0_guess=None, F0_guess=None,
                 K0_guess=None, Kp0_guess=None, verbose=False):
     """Fit parameters of a 3rd order BM EOS"""
     if V0_guess is None:
@@ -36,13 +36,20 @@ def fit_BM3_EOS(V, F, V0_guess=None, F0_guess=None,
     if Kp0_guess is None:
         Kp0_guess = 4.0
 
-    popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM3_EOS_energy, V, F,
-                                 p0=[V0_guess, F0_guess, K0_guess, Kp0_guess],
-                                 full_output=True, maxfev=10000)
-
-    print(ier) # 1,2,3 or 4 is okay
-    print(mesg)
-    print("Condition number of covarience matrix", np.linalg.cond(pcov))
+    if EOStype == 'BM3':
+        popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM3_EOS_energy, V, F,
+                                     p0=[V0_guess, F0_guess, K0_guess, Kp0_guess],
+                                     full_output=True, maxfev=10000)
+    elif EOStype == 'BM2':
+        popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM2_EOS_energy, V, F,
+                                     p0=[V0_guess, F0_guess, K0_guess],
+                                     full_output=True, maxfev=10000)
+    else:
+        assert False, "Unknown EOS type"
+    
+    print(f"ier = {ier}") # 1,2,3 or 4 is okay
+    print(f"mesg = {mesg}")
+    print(f"Condition number of covarience matrix {np.linalg.cond(pcov)}")
     perr = np.sqrt(np.diag(pcov))
     V0 = popt[0]
     V0_err = perr[0]
@@ -50,10 +57,15 @@ def fit_BM3_EOS(V, F, V0_guess=None, F0_guess=None,
     E0_err = perr[1]
     K0 = popt[2]
     K0_err = perr[2]
-    Kp0 = popt[3]
-    Kp0_err = perr[3]
+    if EOStype == 'BM3':
+        Kp0 = popt[3]
+        Kp0_err = perr[3]
+    elif EOStype == 'BM2':
+        Kp0 = 4.0
+        Kp0_err = 0.0
+
     if verbose:
-        print("Fitted 3rd order Birch-Murnaghan EOS parameters:")
+        print(f"Fitted {EOStype} EOS. Parameters are:")
         print(f" E0  = {E0:7g} eV, sigma = {E0_err:7g} eV")
         print(f" V0  = {V0:7g} A**3, sigma = {V0_err:7g} A**3")
         print(f" K0  = {K0:7g} eV.A**-3, sigma = {K0_err:7g} A**3")
@@ -71,17 +83,33 @@ def BM3_EOS_energy(V, V0, E0, K0, Kp0):
     return E
 
 
-def fit_BM3_pressure_EOS(P, V, verbose=False):
+def BM2_EOS_energy(V, V0, E0, K0):
+    """Calculate the energy from a 2nd order BM EOS"""
+
+    E = E0 + ((9.0 * V0 * K0) / 16.0) * ((((V0 / V) ** (2.0 / 3.0) - 1.0) ** 3.0) * 4.0 +
+                                         (((V0 / V) ** (2.0 / 3.0) - 1.0) ** 2.0 * (
+                                                     6.0 - 4.0 * (V0 / V) ** (2.0 / 3.0))))
+    return E
+
+
+def fit_pressure_EOS(P, V, EOStype='BM3', verbose=False):
     """Fit parameters of a 3rd order BM EOS from PV data"""
     V0_guess = np.mean(V)
     K0_guess = 170.0 # eV.A**3 (which is approx 27000 GPa)
                      # preserved as default for back compat
     Kp0_guess = 4.0
 
-    popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM3_EOS_pressure, V, P,
-                                 p0=[V0_guess, K0_guess, Kp0_guess],
-                                 full_output=True, maxfev=10000)
-
+    if EOStype == 'BM3':
+        popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM3_EOS_pressure, V, P,
+                                     p0=[V0_guess, K0_guess, Kp0_guess],
+                                     full_output=True, maxfev=10000)
+    elif EOStype == 'BM2':
+        popt, pcov, infodict, mesg, ier  = spopt.curve_fit(BM3_EOS_pressure, V, P,
+                                     p0=[V0_guess, K0_guess],
+                                     full_output=True, maxfev=10000)
+    else:
+        assert False, "Unknown EOS type"
+        
     print(ier) # 1,2,3 or 4 is okay
     print(mesg)
     print("Condition number of covarience matrix", np.linalg.cond(pcov))
@@ -90,13 +118,18 @@ def fit_BM3_pressure_EOS(P, V, verbose=False):
     V0_err = perr[0]
     K0 = popt[1]
     K0_err = perr[1]
-    Kp0 = popt[2]
-    Kp0_err = perr[2]
+    if EOStype == 'BM3':
+        Kp0 = popt[3]
+        Kp0_err = perr[3]
+    elif EOStype == 'BM2':
+        Kp0 = 4.0
+        Kp0_err = 0.0
+
     if verbose:
-        print("Fitted 3rd order Birch-Murnaghan EOS parameters:")
+        print(f"Fitted {EOStype} EOS. Parameters are:")
         print(f" V0  = {V0:7g} A**3, sigma = {V0_err:7g} A**3")
-        print(f" K0  = {K0:7g} GPa, sigma = {K0_err:7g} GPa")
-        print(f"   ( = {K0/160.218:7g} eV.A**-3, sigma = {K0_err/160.218:7g} eV.A**-3)")
+        print(f" K0  = {K0:7g} eV.A**-3, sigma = {K0_err:7g} A**3")
+        print(f"   ( = {K0*160.218:7g} GPa, sigma = {K0_err*160.218:7g} GPa)")
         print(f" K0' = {Kp0:7g}, sigma = {Kp0_err:7g}")
     return V0, K0, Kp0
 
@@ -109,8 +142,16 @@ def BM3_EOS_pressure(V, V0, K0, Kp0):
     return P
 
 
+def BM2_EOS_pressure(V, V0, K0):
+    """Calculate the pressure from a 2nd order BM EOS"""
+
+    P = (3.0 * K0 / 2.0) * ((V0 / V) ** (7.0 / 3.0) - (V0 / V) ** (5.0 / 3.0)) * \
+        (1.0 + (3.0 / 4.0) * (4.0 - 4.0) * ((V0 / V) ** (2.0 / 3.0) - 1))
+    return P
+
+
 def fit_parameters_quad(Ts, V0s, E0s, K0s, Kp0s,
-                        plot=False, filename=None, table=None):
+                        EOStype='BM3', plot=False, filename=None, table=None):
     poptv, pconv = spopt.curve_fit(_quint_func, np.array(Ts),
                                    np.array(V0s), p0=[0.0, 0.0, 0.0,
                                                       0.0, 0.0, np.mean(V0s)])
@@ -129,11 +170,14 @@ def fit_parameters_quad(Ts, V0s, E0s, K0s, Kp0s,
     fK0 = lambda t: _quint_func(t, poptk[0], poptk[1], poptk[2],
                                 poptk[3], poptk[4], poptk[5])
 
-    poptkp, pconv = spopt.curve_fit(_quint_func, np.array(Ts),
-                                    np.array(Kp0s), p0=[0.0, 0.0, 0.0,
-                                                        0.0, 0.0, np.mean(Kp0s)])
-    fKp0 = lambda t: _quint_func(t, poptkp[0], poptkp[1], poptkp[2],
-                                 poptkp[3], poptkp[4], poptkp[5])
+    if EOStype == 'BM3':
+        poptkp, pconv = spopt.curve_fit(_quint_func, np.array(Ts),
+                                        np.array(Kp0s), p0=[0.0, 0.0, 0.0,
+                                                            0.0, 0.0, np.mean(Kp0s)])
+        fKp0 = lambda t: _quint_func(t, poptkp[0], poptkp[1], poptkp[2],
+                                     poptkp[3], poptkp[4], poptkp[5])
+    else:
+        fKp0 = None
 
     if table is not None:
         # Write out (LaTeX) table of EOS fitting functions
@@ -156,12 +200,13 @@ def fit_parameters_quad(Ts, V0s, E0s, K0s, Kp0s,
                  + _f_2_latex(poptk[3] * 160.218) + 'T^2'
                  + _f_2_latex(poptk[4] * 160.218) + 'T'
                  + _f_2_latex(poptk[5] * 160.218) + '$\n')
-        fh.write('$K^{\prime}_0(T) = ' + _f_2_latex(poptkp[0], noplus=True) + 'T^5'
-                 + _f_2_latex(poptkp[1]) + 'T^4'
-                 + _f_2_latex(poptkp[2]) + 'T^3'
-                 + _f_2_latex(poptkp[3]) + 'T^2'
-                 + _f_2_latex(poptkp[4]) + 'T'
-                 + _f_2_latex(poptkp[5]) + '$\n')
+        if EOStype == 'BM3':
+            fh.write('$K^{\prime}_0(T) = ' + _f_2_latex(poptkp[0], noplus=True) + 'T^5'
+                     + _f_2_latex(poptkp[1]) + 'T^4'
+                     + _f_2_latex(poptkp[2]) + 'T^3'
+                     + _f_2_latex(poptkp[3]) + 'T^2'
+                     + _f_2_latex(poptkp[4]) + 'T'
+                     + _f_2_latex(poptkp[5]) + '$\n')
         fh.close
 
     if plot:
@@ -185,11 +230,12 @@ def fit_parameters_quad(Ts, V0s, E0s, K0s, Kp0s,
         ax.plot(fTs, fK0(fTs) * 160.218, 'k-')
         ax.set_xlabel('T (K)')
         ax.set_ylabel('K$_0$ (GPa)')
-        ax = fig.add_subplot(223)
-        ax.plot(Ts, Kp0s, "ko")
-        ax.plot(fTs, fKp0(fTs), 'k-')
-        ax.set_xlabel('Temperature (K)')
-        ax.set_ylabel(r'K$^{\prime}$$_0$')  # Ugly hack to work around
+        if EOStype == 'BM3':
+            ax = fig.add_subplot(223)
+            ax.plot(Ts, Kp0s, "ko")
+            ax.plot(fTs, fKp0(fTs), 'k-')
+            ax.set_xlabel('Temperature (K)')
+            ax.set_ylabel(r'K$^{\prime}$$_0$')  # Ugly hack to work around
         # matplotlib LaTeX bug.
         ax = fig.add_subplot(224)
         ax.plot(Ts, E0s, 'ko')
@@ -221,7 +267,7 @@ def _f_2_latex(value, prec=2, mathmode=True, noplus=False):
     return latex
 
 
-def BM3_EOS_energy_plot(V, F, V0, E0, K0, Kp0, filename=None, Ts=None,
+def EOS_energy_plot(V, F, V0, E0, K0, Kp0, EOStype='BM3', filename=None, Ts=None,
                         staticV=None, staticF=None, staticV0=None, staticE0=None,
                         staticK0=None, staticKp0=None, ax=None):
     import matplotlib
@@ -245,7 +291,12 @@ def BM3_EOS_energy_plot(V, F, V0, E0, K0, Kp0, filename=None, Ts=None,
         cmap.set_clim(vmin=0, vmax=max(Ts) * 1.5)
         for i in range(len(Ts)):
             fine_vs = np.linspace(np.min(V[i]), np.max(V[i]), 100)
-            fine_fs = BM3_EOS_energy(fine_vs, V0[i], E0[i], K0[i], Kp0[i])
+            if EOStype == 'BM3':
+                fine_fs = BM3_EOS_energy(fine_vs, V0[i], E0[i], K0[i], Kp0[i])
+            elif EOStype == 'BM2':
+                fine_fs = BM2_EOS_energy(fine_vs, V0[i], E0[i], K0[i])
+            else:
+                assert False, "Unknown EOS"
             c = cmap.to_rgba(Ts[i])
             ax.plot(fine_vs, fine_fs, '--', color=c)
             ax.plot(V[i], F[i], 'o', color=c, label='{:5g} K'.format(Ts[i]))
@@ -253,8 +304,14 @@ def BM3_EOS_energy_plot(V, F, V0, E0, K0, Kp0, filename=None, Ts=None,
             # Add the static line
             fine_vs = np.linspace(np.min(staticV[i]),
                                   np.max(staticV[i]), 100)
-            fine_fs = BM3_EOS_energy(fine_vs, staticV0, staticE0,
-                                     staticK0, staticKp0)
+            if EOStype == 'BM3':
+                fine_fs = BM3_EOS_energy(fine_vs, staticV0, staticE0,
+                                         staticK0, staticKp0)
+            elif EOStype == 'BM2':
+                fine_fs = BM2_EOS_energy(fine_vs, staticV0, staticE0,
+                                         staticK0)
+            else:
+                assert False, "Unknown EOS"
             ax.plot(fine_vs, fine_fs, '-k', color=c)
             ax.plot(staticV, staticF, 'sk', label='static')
         ax.legend(ncol=3, bbox_to_anchor=(0., 0.96, 1., .102), loc=3,
@@ -269,7 +326,7 @@ def BM3_EOS_energy_plot(V, F, V0, E0, K0, Kp0, filename=None, Ts=None,
             plt.show()
 
 
-def BM3_EOS_pressure_plot(Vmin, Vmax, V0, K0, Kp0, ax=None,
+def EOS_pressure_plot(Vmin, Vmax, V0, K0, Kp0, EOStype='BM3', ax=None,
                           filename=None, Ts=None, leg=True):
     import matplotlib
     if filename is not None:
@@ -283,7 +340,12 @@ def BM3_EOS_pressure_plot(Vmin, Vmax, V0, K0, Kp0, ax=None,
 
     if isinstance(V0, np.ndarray):
         fine_vs = np.linspace(Vmin, Vmax, 100)
-        fine_ps = BM3_EOS_pressure(fine_vs, V0, K0, Kp0)
+        if EOStype == 'BM3':
+            fine_ps = BM3_EOS_pressure(fine_vs, V0, K0, Kp0)
+        elif EOStype == 'BM2':
+            fine_ps = BM2_EOS_pressure(fine_vs, V0, K0)
+        else:
+            assert False, "Unknown EOS"
         fine_ps = fine_ps * 160.218
         ax.plot(fine_ps, fine_vs, 'r-')
     else:
@@ -292,7 +354,12 @@ def BM3_EOS_pressure_plot(Vmin, Vmax, V0, K0, Kp0, ax=None,
         cmap.set_clim(vmin=0, vmax=max(Ts) * 1.5)
         for i in range(len(Ts)):
             fine_vs = np.linspace(Vmin, Vmax, 100)
-            fine_ps = BM3_EOS_pressure(fine_vs, V0[i], K0[i], Kp0[i])
+            if EOStype == 'BM3':
+                fine_ps = BM3_EOS_pressure(fine_vs, V0[i], K0[i], Kp0[i])
+             elif EOStype == 'BM2':
+                fine_ps = BM2_EOS_pressure(fine_vs, V0[i], K0[i])
+            else:
+                assert False, "Unknown EOS"
             # Put in GPa
             fine_ps = fine_ps * 160.218
             c = cmap.to_rgba(Ts[i])
@@ -309,8 +376,8 @@ def BM3_EOS_pressure_plot(Vmin, Vmax, V0, K0, Kp0, ax=None,
             plt.show()
 
 
-def BM3_EOS_twoplots(minV, maxV, Vs, Fs, V0s, E0s, K0s,
-                     Kp0s, Ts, filename=None):
+def EOS_twoplots(minV, maxV, Vs, Fs, V0s, E0s, K0s,
+                     Kp0s, Ts, EOStype='BM3', filename=None):
     import matplotlib
     if filename is not None:
         matplotlib.use('Agg')
@@ -318,23 +385,28 @@ def BM3_EOS_twoplots(minV, maxV, Vs, Fs, V0s, E0s, K0s,
     fig = plt.figure(figsize=(5.83, 8.27), dpi=150)
     fig.subplots_adjust(left=0.2, right=0.9, top=0.9, bottom=0.1)
     ax1 = fig.add_subplot(211)
-    BM3_EOS_energy_plot(Vs, Fs, V0s, E0s, K0s, Kp0s, Ts=Ts, ax=ax1)
+    EOS_energy_plot(Vs, Fs, V0s, E0s, K0s, Kp0s, Ts=Ts, ax=ax1, EOStype=EOStype)
     ax2 = fig.add_subplot(212)
-    BM3_EOS_pressure_plot(minV, maxV, V0s, K0s,
-                          Kp0s, Ts=Ts, ax=ax2, leg=False)
+    EOS_pressure_plot(minV, maxV, V0s, K0s,
+                          Kp0s, Ts=Ts, ax=ax2, leg=False, EOStype=EOStype)
     if filename is not None:
         plt.savefig(filename)
     else:
         plt.show()
 
 
-def get_V(P, T, fV0, fK0, fKp0):
+def get_V(P, T, fV0, fK0, fKp0, EOStype='BM3'):
     # Put P into eV/A**3
     P = P / 160.218
     V0 = fV0(T)
     K0 = fK0(T)
-    Kp0 = fKp0(T)
-    p_err_func = lambda v: BM3_EOS_pressure(v, V0, K0, Kp0) - P
+    if EOStype == 'BM3':
+        Kp0 = fKp0(T)
+        p_err_func = lambda v: BM3_EOS_pressure(v, V0, K0, Kp0) - P
+    elif EOStype == 'BM2':
+        p_err_func = lambda v: BM2_EOS_pressure(v, V0, K0) - P
+    else:
+        assert False, "Unknown EOS"
     V = spopt.brentq(p_err_func, 0.8 * V0, 1.2 * V0)
     return V
 
@@ -561,6 +633,8 @@ if __name__ == "__main__":
                         help='Use volume-pressure EOS parameters as initial guess for FV fits')
     parser.add_argument('--max_t_in_castep', default=None, type=float,
                         help="Maximum temperature of thermodynamic data to extract from CASTEP files (default is to read all data)")
+    parser.add_argument('--EOStype', default='BM3', type=str,
+                        help="Choose the EOS type (BM3 or BM2)")
     args = parser.parse_args()
 
     # Build basic data table
@@ -591,29 +665,29 @@ if __name__ == "__main__":
     print(f)
     if args.use_pv or args.do_pv:
         print("Fitting to static PV data")
-        v0_guess, k0_guess, kp0_guess = fit_BM3_pressure_EOS(p, v, verbose=True)
+        v0_guess, k0_guess, kp0_guess = fit_pressure_EOS(p, v, verbose=True, EOStype=args.EOStype)
     if not args.do_pv:
         # Guesses back to default
         v0_guess=None
         k0_guess=None
         kp0_guess=None
   
-    v0, e0, k0, kp0 = fit_BM3_EOS(v, f, V0_guess=v0_guess, 
-        K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True)
+    v0, e0, k0, kp0 = fit_EOS(v, f, V0_guess=v0_guess, 
+        K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True, EOStype=args.EOStype)
     print("Working on 0K case")
     v, f = get_VF(data, 0.0)
     print(v)
     print(f)
-    v0, e0, k0, kp0 = fit_BM3_EOS(v, f, V0_guess=v0_guess,
-        K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True)
+    v0, e0, k0, kp0 = fit_EOS(v, f, V0_guess=v0_guess,
+        K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True, EOStype=args.EOStype)
     ts = [0] + ts
     for t in ts:
         print("Working on:", t, "K")
         v, f = get_VF(data, t)
         print(v)
         print(f)
-        v0, e0, k0, kp0 = fit_BM3_EOS(v, f, V0_guess=v0_guess,
-            K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True)
+        v0, e0, k0, kp0 = fit_EOS(v, f, V0_guess=v0_guess,
+            K0_guess=k0_guess, Kp0_guess=kp0_guess, verbose=True, EOStype=args.EOStype)
         if np.max(v) > max_v: max_v = np.max(v)
         if np.min(v) < min_v: min_v = np.min(v)
         vs.append(v)
@@ -625,8 +699,8 @@ if __name__ == "__main__":
 
     # If we need them, plot graphs of isothemal EOS
     if args.plot_both is not None:
-        BM3_EOS_twoplots(np.floor(min_v), np.ceil(max_v),
-                         vs, fs, v0s, e0s, k0s, kp0s, ts, filename=args.plot_both)
+        EOS_twoplots(np.floor(min_v), np.ceil(max_v),
+                         vs, fs, v0s, e0s, k0s, kp0s, ts, filename=args.plot_both, EOStype=args.EOStype)
     if args.plot_pv is not None:
         raise NotImplementedError
     if args.plot_ev is not None:
@@ -637,9 +711,9 @@ if __name__ == "__main__":
     if args.polyplot is not None:
         pplot = True
     fv0, fe0, fk0, fkp0 = fit_parameters_quad(ts, v0s, e0s, k0s, kp0s,
-                                              plot=pplot, filename=args.polyplot, table=args.latex_table)
+                                              plot=pplot, filename=args.polyplot, table=args.latex_table, EOStype=args.EOStype)
 
     print("P (GPa) T (K) V (ang**3)")
     for evalp in np.arange(args.min_p, args.max_p, args.step_p):
         for evalt in np.arange(args.min_t, args.max_t, args.step_t):
-            print(evalp, evalt, get_V(evalp, evalt, fv0, fk0, fkp0))
+            print(evalp, evalt, get_V(evalp, evalt, fv0, fk0, fkp0, EOStype=args.EOStype))
