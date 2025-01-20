@@ -442,7 +442,7 @@ def parse_castep_file(filename, current_data=[], verbose=False):
                     print(f"T: {T}, H: {H}, U: {U}, F: {F}")
                 # A horrible hack from AMW...
                 # to limt T range for FeAlO3 pv
-                if T < 2000.0:
+                if T < 2000.0: # FIXME - make this an option
                     current_data.append((current_volume, U, zpe, T,
                                          E, F, S, Cv, P))
                     ts.append(T)
@@ -565,11 +565,15 @@ if __name__ == "__main__":
 
     # Build basic data table
     data = []
+    first_ts = None
     for file in args.datafiles:
-        print("Reading data from: ", file)
-        # data, ts = read_data_file(file, data)
-        # NB: we assume that ts is the same for each file!
+        print(f"Reading data from: {file} ...", end=' ')
         data, ts = parse_castep_file(file, data)
+        if first_ts is not None:
+            assert first_ts == ts, "Temperatures changed in file"
+        else:
+            first_ts = ts
+        print(f"{len(ts)} temperatures read")
 
     # Fit EOS parameters at each T and store
     vs = []
