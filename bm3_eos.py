@@ -362,7 +362,7 @@ def read_data_file(filename, data):
     return data, ts
 
 
-def parse_castep_file(filename, current_data=[], verbose=False):
+def parse_castep_file(filename, current_data=[], verbose=False, max_t=None):
     """Read a Castep output file with thermodynamic data and extract it
 
        This appends thermodynamic data, in the form of a tuple, for
@@ -440,9 +440,7 @@ def parse_castep_file(filename, current_data=[], verbose=False):
                 Upv = H - (current_volume * P / 160.21766208)
                 if verbose:
                     print(f"T: {T}, H: {H}, U: {U}, F: {F}")
-                # A horrible hack from AMW...
-                # to limt T range for FeAlO3 pv
-                if T < 2000.0: # FIXME - make this an option
+                if (max_t is None) or ((max_t is not None) and (T < max_t)):
                     current_data.append((current_volume, U, zpe, T,
                                          E, F, S, Cv, P))
                     ts.append(T)
@@ -561,6 +559,8 @@ if __name__ == "__main__":
                         help='Fit the volume-pressure data and report (static) EOS parameters')
     parser.add_argument('--use_pv', default=False, type=bool,
                         help='Use volume-pressure EOS parameters as initial guess for FV fits')
+    parser.add_argument('--max_t_in_castep', default=None, type=float,
+                        help="Maximum temperature of thermodynamic data to extract from CASTEP files (default is to read all data)")
     args = parser.parse_args()
 
     # Build basic data table
