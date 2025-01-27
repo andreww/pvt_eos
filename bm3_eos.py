@@ -601,6 +601,8 @@ if __name__ == "__main__":
              """
 
     import argparse
+    import traceback
+    import sys
 
     parser = argparse.ArgumentParser(description=help_str)
     parser.add_argument('datafiles', nargs='+',
@@ -716,4 +718,10 @@ if __name__ == "__main__":
     print("P (GPa) T (K) V (ang**3)")
     for evalp in np.arange(args.min_p, args.max_p, args.step_p):
         for evalt in np.arange(args.min_t, args.max_t, args.step_t):
-            print(evalp, evalt, get_V(evalp, evalt, fv0, fk0, fkp0, EOStype=args.EOStype))
+            try:
+                calc_volume = get_V(evalp, evalt, fv0, fk0, fkp0, EOStype=args.EOStype)
+            except ValueError as ex:
+                calc_volume = None
+                traceback.print_exception(ex, file=sys.stderr)
+
+            print(evalp, evalt, calc_volume)
