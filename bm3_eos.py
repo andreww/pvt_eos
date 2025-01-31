@@ -314,8 +314,13 @@ def EOS_energy_plot(V, F, V0, E0, K0, Kp0, EOStype='BM3', filename=None, Ts=None
                 assert False, "Unknown EOS"
             ax.plot(fine_vs, fine_fs, '-k', color=c)
             ax.plot(staticV, staticF, 'sk', label='static')
-        ax.legend(ncol=3, bbox_to_anchor=(0., 0.96, 1., .102), loc=3,
-                  mode="expand", borderaxespad=0., numpoints=1)
+        if len(Ts) > 9:
+            ax.legend(ncol=4, bbox_to_anchor=(0., 0.96, 1., .102), loc=3,
+                      mode="expand", borderaxespad=0., numpoints=1,
+                      markerscale=0.5, fontsize='x-small')
+        else:
+            ax.legend(ncol=3, bbox_to_anchor=(0., 0.96, 1., .102), loc=3,
+                      mode="expand", borderaxespad=0., numpoints=1)
 
     ax.set_xlabel('Volume (A$^3$)')
     ax.set_ylabel('Helmholtz free energy (eV)')
