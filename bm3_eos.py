@@ -315,9 +315,9 @@ def EOS_energy_plot(V, F, V0, E0, K0, Kp0, EOStype='BM3', filename=None, Ts=None
             ax.plot(fine_vs, fine_fs, '-k', color=c)
             ax.plot(staticV, staticF, 'sk', label='static')
         if len(Ts) > 9:
-            ax.legend(ncol=5, bbox_to_anchor=(0., 0.96, 1., .102), loc=3,
+            ax.legend(ncol=6, bbox_to_anchor=(0., 0.96, 1., .102), loc=3,
                       mode="expand", borderaxespad=0., numpoints=1,
-                      markerscale=0.5, fontsize='x-small')
+                      markerscale=0.5, fontsize='x-small', labelspacing=0.25)
         else:
             ax.legend(ncol=3, bbox_to_anchor=(0., 0.96, 1., .102), loc=3,
                       mode="expand", borderaxespad=0., numpoints=1)
