@@ -407,7 +407,7 @@ def get_V(P, T, fV0, fK0, fKp0, EOStype='BM3'):
         p_err_func = lambda v: BM2_EOS_pressure(v, V0, K0) - P
     else:
         assert False, "Unknown EOS"
-    V = spopt.brentq(p_err_func, 0.8 * V0, 1.2 * V0)
+    V = spopt.brentq(p_err_func, 0.5 * V0, 2.0 * V0)
     return V
 
 
