@@ -461,42 +461,49 @@ def parse_castep_file(filename, current_data=[], verbose=False, max_t=None):
         if skip_lines > 0:
             skip_lines = skip_lines - 1
             continue
-        match = _vol_re.search(line)
-        if match:
-            # We need to keep track of the *current* volume
-            current_volume = float(match.group(1))
-            if verbose:
-                print(f"Volume: {current_volume}")
-            continue
-        match = _ufb_re.search(line)
-        if match:
-            U = float(match.group(1))
-            if verbose:
-                print(f"Internal energy: {U}")
-            continue
-        match = _enth_re.search(line)
-        if match:
-            H = float(match.group(1))
-            if verbose:
-                print(f"Enthalpy: {H}")
-            continue
-        match = _p_re.search(line)
-        if match:
-            # We need the actual pressure for PV correction
-            P = float(match.group(1))
-            if verbose:
-                print(f"Pressure: {P} GPa")
-        match = _zpe_re.search(line)
-        if match:
-            # A line with the zero point energy must start a
-            # thermo block. We need to skip three
-            # lines first though.
-            zpe = float(match.group(1))
-            if verbose:
-                print(f"Zero point energy energy: {zpe}")
-            in_thermo = True
-            skip_lines = 3
-            continue
+        # We try to do simple "word" matching to speed up the REs...
+        if 'Current' in line:
+            match = _vol_re.search(line)
+            if match:
+                # We need to keep track of the *current* volume
+                current_volume = float(match.group(1))
+                if verbose:
+                    print(f"Volume: {current_volume}")
+                continue
+        if 'Total' in line:
+            match = _ufb_re.search(line)
+            if match:
+                U = float(match.group(1))
+                if verbose:
+                    print(f"Internal energy: {U}")
+                continue
+        if 'LBFGS' in line:
+            match = _enth_re.search(line)
+            if match:
+                H = float(match.group(1))
+                if verbose:
+                    print(f"Enthalpy: {H}")
+                continue
+        if 'Pressure' in line:
+            match = _p_re.search(line)
+            if match:
+                # We need the actual pressure for PV correction
+                P = float(match.group(1))
+                if verbose:
+                    print(f"Pressure: {P} GPa")
+        if 'Zero-point' in line:
+            match = _zpe_re.search(line)
+            if match:
+                # A line with the zero point energy must start a
+                # thermo block. We need to skip three
+                # lines first though.
+                zpe = float(match.group(1))
+                if verbose:
+                    print(f"Zero point energy energy: {zpe}")
+                in_thermo = True
+                skip_lines = 3
+                continue
+
         if in_thermo:
             # This is the bulk of the data in the table
             match = _tmo_re.search(line)
