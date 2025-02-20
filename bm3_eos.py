@@ -116,11 +116,11 @@ def fit_pressure_EOS(P, V, EOStype='BM3', verbose=False):
     perr = np.sqrt(np.diag(pcov))
     V0 = popt[0]
     V0_err = perr[0]
-    K0 = popt[1]
-    K0_err = perr[1]
+    K0 = popt[1] / 160.218 # To eV.A**-3
+    K0_err = perr[1] / 160.218 # To eV.A**-3
     if EOStype == 'BM3':
-        Kp0 = popt[3]
-        Kp0_err = perr[3]
+        Kp0 = popt[2]
+        Kp0_err = perr[2]
     elif EOStype == 'BM2':
         Kp0 = 4.0
         Kp0_err = 0.0
